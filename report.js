@@ -12,6 +12,17 @@ const GRAPHQL_HOST = "http://localhost:3045/";
 const OUT_CREATED_FILE = path.join("/tmp", "created.csv");
 const OUT_REGISTERED_FILE = path.join("/tmp", "registered.csv");
 
+const formatDate = (date) => {
+  const yyyy = date.getFullYear();
+  let mm = date.getMonth() + 1; // month is zero-based
+  let dd = date.getDate();
+
+  if (dd < 10) dd = "0" + dd;
+  if (mm < 10) mm = "0" + mm;
+
+  return `${yyyy}/${mm}/${dd}`;
+};
+
 const createdQuery = {
   query: `query {
         events(
@@ -50,12 +61,13 @@ const main = async () => {
     })
     .then((response) => {
       const events = response.data.data.events.nodes;
-      const csvLines = events.map(
-        (event) =>
-          `${event.blockId},${event.block.datetime},${event.creatorDid},${event.ticker},${event.isDivisible},${event.assetType}`
-      );
+      const csvLines = events.map((event) => {
+        const blockTime = event.block.datetime;
+        const blockDay = formatDate(new Date(blockTime));
+        return `${event.blockId},${blockTime},${blockDay},${event.creatorDid},${event.ticker},${event.isDivisible},${event.assetType}`;
+      });
       const csvContent =
-        "blockId,datetime,creatorDid,ticker,isDivisible,assetType\n" +
+        "blockId,blockTime,blockDate,creatorDid,ticker,isDivisible,assetType\n" +
         csvLines.join("\n");
       fs.writeFileSync(OUT_CREATED_FILE, csvContent);
     })
@@ -101,18 +113,16 @@ const main = async () => {
       const events = response.data.data.events.nodes;
       const csvLines = events.map((event) => {
         const expiry = new Date(Number(event.expiry));
-        const yyyy = expiry.getFullYear();
-        let mm = expiry.getMonth() + 1; // month is zero-based
-        let dd = expiry.getDate();
 
-        if (dd < 10) dd = "0" + dd;
-        if (mm < 10) mm = "0" + mm;
-        const formatted = dd + "/" + mm + "/" + yyyy;
+        const formatted = formatDate(expiry);
+        const blockTime = event.block.datetime;
+        const blockDate = formatDate(new Date(blockTime));
 
-        return `${event.blockId},${event.block.datetime},${event.creatorDid},${event.ticker},${formatted}`;
+        return `${event.blockId},${blockTime},${blockDate},${event.creatorDid},${event.ticker},${formatted}`;
       });
       const csvContent =
-        "blockId,datetime,creatorDid,ticker,expiry\n" + csvLines.join("\n");
+        "blockId,blockTime,blockDate,creatorDid,ticker,expiry\n" +
+        csvLines.join("\n");
       fs.writeFileSync(OUT_REGISTERED_FILE, csvContent);
     })
     .catch((error) => {
@@ -162,7 +172,7 @@ const main = async () => {
 
 main()
   .then(() => {
-    console.log("all done");
+    console.log(`Success at: ${new Date()}`);
   })
   .catch((err) => {
     console.error("error happened", err);
